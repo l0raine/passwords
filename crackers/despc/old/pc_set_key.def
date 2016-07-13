@@ -1,0 +1,3 @@
+LIBRARY pc_des_set_key
+EXPORTS sse2_DES_set_key
+EXPORTS init_subkeys

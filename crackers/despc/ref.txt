@@ -1,0 +1,27 @@
+
+What hackers don't want you to know...
+ftp://ftp.software.ibm.com/software/mktsupport/techdocs/hackers.pdf
+
+04.11.97 release of tool
+http://mail.blockyourid.com/~gbpprorg/l0pht/advisories/l0phtcrack.txt
+
+L0pht Advisory: release of L0phtCrack for NT
+http://seclists.org/bugtraq/1997/Apr/27
+
+7/12/97 update to 1.5
+http://mail.blockyourid.com/~gbpprorg/l0pht/advisories/l0phtcrack15.txt
+
+L0phtcrack 1.5 Lanman / NT password hash cracker
+http://insecure.org/sploits/l0phtcrack.lanman.problems.html
+
+Yup we came out with l0phtCrack v2.0
+http://seclists.org/bugtraq/1998/Feb/59
+
+l0phtcrack 2.5 released
+http://seclists.org/bugtraq/1999/Jan/54
+
+Major speed increase. The DES routines have been highly optimized in 
+assembler for Pentium, Pentium MMX, Pentium Pro, and Pentium II specific 
+processors. This results in a 450% speed increase. All alphanumeric 
+passwords can be found in under 24 hours on a Pentium II/450. 
+

@@ -1,0 +1,7 @@
+des_func.asm(362) : Error A2102: Symbol not defined : key
+des_func.asm(364) : Error A2102: Symbol not defined : key
+des_func.asm(366) : Error A2102: Symbol not defined : key
+des_func.asm(368) : Error A2102: Symbol not defined : key
+des_func.asm(370) : Error A2102: Symbol not defined : key
+des_func.asm(374) : Error A2102: Symbol not defined : l_ctr
+des_func.asm(408) : Error A2102: Symbol not defined : l_ctr

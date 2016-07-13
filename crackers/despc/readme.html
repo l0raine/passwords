@@ -1,0 +1,641 @@
+<strong>Introduction</strong>
+
+L0pht Heavy Industries is a distinguished group of hackers, that at one time operating out of Boston, Massachusetts, USA between 1992 and 2000.
+
+It was a documentary on BBC around early 2000 featuring the group and other hackers that first intrigued me about the internet.
+
+It was also the climax of a dot-com bubble where L0pht had been acquired by the now defunct computer security company, <a href="https://en.wikipedia.org/wiki/@stake">@stake</a>. 
+
+I was a little disappointed to arrive on the scene where I perceived hacking computers to be in the process of commodification but that's the way it is.
+
+This is more of a story behind the process of optimizing DES routines for L0phtCrack than anything else and I make a lot of assumptions in how it was accomplished.
+
+At the turn of the millenium when running password crackers on GPU was a dream, hackers would use tools like <a href="https://en.wikipedia.org/wiki/Crack_%28password_software%29">Alec Muffet's Crack</a> and <a href="http://www.openwall.com/john/">Solar Designer's JTR.</a> Another tool that was popular, specifically for attacking windows passwords was L0phtCrack. 
+
+Some of you might remember L0phtCrack. Maybe you're around long enough to know it was first published all the way back in <a href="http://seclists.org/bugtraq/1997/Apr/27">April 1997</a> I didn't have a computer back then but around 2001 did manage to try out L0phtCrack 3.0 and was amazed at the speed of recovery in comparison to other tools freely available at the time.
+
+Around 2004 while playing around with some password crackers, I couldn't figure out why my lanman cracker was so slow in comparison to L0phtCrack. I ended up using assembler routines thinking it would be enough but still no where close. Were they using bitslice code by Matthew Kwan?
+
+When 2.5 was released in early 1999, they announced enhancements to speed of DES routines.
+
+<blockquote>Major speed increase. The DES routines have been highly optimized in assembler for Pentium, Pentium MMX, Pentium Pro, and Pentium II specific processors. This results in a 450% speed increase. All alphanumeric passwords can be found in under 24 hours on a Pentium II/450. </blockquote>
+
+The first release of L0phtCrack was in  and it followed the release of <a href="http://ftp.vim.org/networking/samba/pwdump/">pwdump</a> by Jeremy Allison a month earlier.
+
+They released source code for <a href="http://insecure.org/sploits/l0phtcrack.lanman.problems.html">L0phtcrack 1.5 in July 1997</a> giving a good explanation of why the Lanman hash was so bad and this gives us hints how to attack the LM hash quicker. However the overall majority of optimization exploits the design of the DES algorithm itself which Lanman hashes use.
+
+You could be forgiven at the time believing the optimizations were purely due to optimized assembler, finely tuned for specific Pentium CPU that were popular at the time. The real optimizations exploit key scheduling algorithm and a number of other small things.
+
+<strong>Lanman hash</strong>
+
+Lanman hashes are derived from DES and are rather badly designed.
+
+<strong>LM Hash Generation</strong>
+
+The following code using OpenSSL will generate a Microsoft Lanman hash that are stored in SAM (Security Accounts Manager) database or NTDS (NT Directory System) database.
+
+[code language="cpp"]
+#define MAX_PWD 14
+
+void DES_str_to_key (char str[], uint8_t key[]) 
+{
+  int i;
+
+  key[0] = str[0] >> 1;
+  key[1] = ((str[0] & 0x01) << 6) | (str[1] >> 2);
+  key[2] = ((str[1] & 0x03) << 5) | (str[2] >> 3);
+  key[3] = ((str[2] & 0x07) << 4) | (str[3] >> 4);
+  key[4] = ((str[3] & 0x0F) << 3) | (str[4] >> 5);
+  key[5] = ((str[4] & 0x1F) << 2) | (str[5] >> 6);
+  key[6] = ((str[5] & 0x3F) << 1) | (str[6] >> 7);
+  key[7] = str[6] & 0x7F;
+
+  for (i = 0;i < 8;i++) {
+      key[i] = (key[i] << 1);
+  }
+  DES_set_odd_parity ((DES_cblock*)key);
+}
+
+char* lm (char *pwd) 
+{
+  DES_cblock       key1, key2;
+  DES_key_schedule ks1, ks2;
+  const char       ptext[]="KGS!@#$%";
+  static char      hash[8+1];
+  uint8_t          pw[MAX_PWD+1], ctext[16];
+  int              i;
+  
+  memset (pw, 0, sizeof (pw));
+  strncpy (pw, pwd, MAX_PWD);
+  CharToOem (CharUpper (pw), pw);
+
+  DES_str_to_key (&pw[0], (uint8_t*)&key1);
+  DES_str_to_key (&pw[7], (uint8_t*)&key2);
+  
+  DES_set_key (&key1, &ks1);
+  DES_set_key (&key2, &ks2);
+  
+  DES_ecb_encrypt ((const_DES_cblock*)ptext, 
+    (DES_cblock*)&ctext[0], &ks1, DES_ENCRYPT);
+    
+  DES_ecb_encrypt ((const_DES_cblock*)ptext, 
+    (DES_cblock*)&ctext[8], &ks2, DES_ENCRYPT);
+
+  for (i=0; i<16; i++) {
+    _snprintf (&hash[i*2], 2, "%02X", ((uint8_t*)ctext)[i]);
+  }
+  return hash;
+}
+[/code]
+
+As mentioned in original L0phtCrack documentation, to attack the Microsoft LM hash, you only need to create 1 LM hash so before we start optimizing anything, we need to look at a basic brute force cracker.
+
+<strong>Brute Force Cracker</strong>
+
+Most of you working in security industry realize that brute force attack is usually the last option since rule based cracking is more effective at recovery. Although I'm only documenting a brute force approach, rule based cracking would also work to exploit the weakness in key scheduling which I'll describe next but we need something to compare with overall finished result so here is a very basic LM hash cracker in C.
+
+[code language="cpp"]
+C:\gh\despc\lc15src>lc_cli -b -p single.txt -l
+User: [Administrator] Lanman PW: [ZZZZZZ] NT dialect PW: [ZZZZZZ]
+
+ Completed: 321272406 2.66M k/s
+C:\gh\despc\lc15src>
+[/code]
+
+Bear in mind that this tool was released in 1997 and compilers back then were certainly inferior to what we have now 18 years later so the 450% increase in speed is not going to be achievable. So we start off with a simple password cracker that like lc_cli will search for passwords made from A-Z.
+
+
+
+[code language="cpp"]
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <ctype.h>
+#include <string.h>
+#include <time.h>
+
+#include <openssl/des.h>
+
+#define MAX_PWD 7
+
+char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+int alpha_len;
+
+DES_cblock lm_hash;
+
+char pwd[8], start_pwd[8], end_pwd[8];
+
+uint64_t start_cbn, end_cbn, total_cbn, completed;
+
+/**
+ *
+ *  convert hexadecimal string to binary
+ *
+ */
+int lm2bin(char lm[], uint8_t bin[]) {
+  int len, i, x;
+
+  len = strlen(lm);
+  
+  // lm hashes are 16 bytes
+  if (len!=16) {
+    return 0;
+  }
+  
+  // of hexadecimal characters
+  for (i=0; i<len; i++) {
+    if (isxdigit((int)lm[i]) == 0) {
+      return 0; 
+    }
+  }
+  
+  // convert to binary
+  for (i=0; i<len/2; i++) {
+    sscanf(&lm[i * 2], "%2x", &x);
+    bin[i] = (uint8_t)x;
+  } 
+  return 1;
+} 
+
+/**
+ *
+ *  convert password string to combinations
+ *
+ */ 
+uint64_t pwd2cbn(char pwd[]) {
+  uint64_t cbn = 0;
+  uint64_t pwr = 1;
+  int pw_len, idx, i;
+  
+  pw_len = strlen(pwd);
+  
+  for (i=0; i<pw_len; i++) {
+    idx = strchr(alphabet, pwd[i]) - alphabet + 1;
+    if (idx == 0) {
+      return 0;
+    }
+    cbn += pwr * idx; 
+    pwr *= alpha_len;
+  } 
+  return cbn; 
+}
+
+void cbn2idx (int idx[], uint64_t cbn) 
+{
+  uint64_t pwr = alpha_len;
+  int      pw_len, i;
+  
+  for (pw_len=1; cbn>=pwr; pw_len++) {
+    cbn -= pwr; 
+    pwr *= alpha_len;
+  }
+  
+  for (i=0; i<pw_len; i++) { 
+    idx[i] = (cbn % alpha_len); 
+    cbn /= alpha_len; 
+  }
+}
+
+void DES_str_to_key (char str[], uint8_t key[]) 
+{
+  int i;
+
+  key[0] = str[0] >> 1;
+  key[1] = ((str[0] & 0x01) << 6) | (str[1] >> 2);
+  key[2] = ((str[1] & 0x03) << 5) | (str[2] >> 3);
+  key[3] = ((str[2] & 0x07) << 4) | (str[3] >> 4);
+  key[4] = ((str[3] & 0x0F) << 3) | (str[4] >> 5);
+  key[5] = ((str[4] & 0x1F) << 2) | (str[5] >> 6);
+  key[6] = ((str[5] & 0x3F) << 1) | (str[6] >> 7);
+  key[7] = str[6] & 0x7F;
+
+  for (i = 0;i < 8;i++) {
+      key[i] = (key[i] << 1);
+  }
+  DES_set_odd_parity ((DES_cblock*)key);
+}
+
+// basic function to generate passwords and test
+int crack_lm (void) 
+{
+  uint32_t         idx[8];
+  int              i, found=0;
+  const char       pt[]="KGS!@#$%";
+  DES_cblock       key, ct;
+  DES_key_schedule ks;
+  
+  for (i=0; i<8; i++) idx[i] = -1;
+  for (i=0; i<8; i++) pwd[i] = 0;
+  
+  // convert combinations to indexes
+  cbn2idx(idx, start_cbn);
+  
+  completed=0;
+  
+  do {
+    // get password from indexes
+    for (i=0; i<MAX_PWD; i++) {
+      if (idx[i]==-1) break;
+      pwd[i] = alphabet[idx[i]];
+    }
+    
+    DES_str_to_key (pwd, (uint8_t*)&key);
+    DES_set_key (&key, &ks);
+    DES_ecb_encrypt (pt, &ct, &ks, DES_ENCRYPT);
+    
+    completed++;
+    
+    // check if it matches our hash
+    if (memcmp (ct, lm_hash, 8)==0) {
+      found++;
+      break;
+    }
+    for (i = 0;;i++) {
+      if (++idx[i] != alpha_len) {
+        break;
+      }  
+      idx[i] = 0;
+    }
+  } while (++start_cbn < end_cbn);
+  
+  return found;
+}
+
+void main(int argc, char *argv[]) 
+{
+  clock_t start_time;
+  float fTime, speed;
+  
+  if (argc != 2) {
+    printf("\n  Usage: clm <hash>\n");
+    exit(1);
+  }
+  
+  // convert hash to binary
+  if (!lm2bin(argv[1], lm_hash)) {
+    printf("\n  Invalid hash = %s", argv[1]);
+    exit(2);
+  }
+  
+  memset (start_pwd, 0, sizeof (start_pwd));
+  memset (end_pwd, 0, sizeof (end_pwd));
+  
+  strncpy (start_pwd, "A", MAX_PWD);
+  strncpy (end_pwd, "ZZZZZZZ", MAX_PWD);
+  
+  alpha_len = strlen(alphabet);
+  start_cbn = pwd2cbn(start_pwd);
+  end_cbn = pwd2cbn(end_pwd);
+  
+  start_cbn--;
+  total_cbn = end_cbn - start_cbn;
+  
+  printf ("\nstart pwd : %s", start_pwd);
+  printf ("\nend pwd   : %s",   end_pwd);
+  printf ("\nalphabet  : %s",  alphabet);
+  printf ("\ntotal pwd : %lld\n",  total_cbn);
+  
+  start_time = clock();
+  
+  if (crack_lm()) {
+    printf ("\npassword found: %s", pwd);
+  } else {
+    printf ("\nunable to find password");
+  }
+  
+  fTime = 1.0f * (clock() - start_time) / CLOCKS_PER_SEC;
+  speed = (float)completed / fTime / 1000000;
+  
+  printf("\n Completed: %lld %.2fM k/s", completed, speed);
+}
+[/code]
+
+And the results of this code are?
+
+[code language="cpp"]
+start pwd : A
+end pwd   : ZZZZZZZ
+alphabet  : ABCDEFGHIJKLMNOPQRSTUVWXYZ
+total pwd : 8353082582
+
+password found: ZZZZZZ
+ Completed: 321272406 1.95M k/s
+[/code]
+
+I expected a lot better to be honest but let's continue to look at the weakness of key scheduling.
+
+<strong>Precomputing key schedules</strong>
+
+Now that you understand the basic approach to recovering password of LM hash, here's another piece of code that derives LM hash from precomputed key schedules.
+DES keys are 56-bits or 7 characters which is 2^56 or 72 quadrillion possible combinations which is a lot but we don't need to attack that many keys when there's only 96 unique characters on most keyboards and because Microsoft converts all passwords to uppercase, there are only 70 characters. Most of the time people use combination of letters and numbers so you're talking 36 characters or 8 billion possible passwords.
+
+
+[code language="cpp"]
+
+// DES encryption using precomputed key schedules
+//
+// Odzhan
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <openssl/des.h>
+
+DES_key_schedule ks_tbl[8][256];
+
+// precompute DES key schedules
+void DES_init_keys (void) 
+{
+  DES_cblock key;
+  int i, j;
+  
+  memset (key, 0, sizeof(key));
+  
+  // for 64-bit key
+  for (i=0; i<8; i++) {
+    // create 256 key schedules
+    for (j=0; j<256; j++) {
+      key[i] = j;
+      DES_set_key (&key, &ks_tbl[i][j]);
+    }
+    // clear byte
+    key[i] = 0;
+  }
+}
+
+// derive schedule from precomputed keys
+void DES_set_keyx (DES_cblock *key, DES_key_schedule *ks) 
+{
+  DES_LONG *src, *dst;
+  int i, j;
+  uint8_t *x;
+  
+  dst = (DES_LONG*)ks;
+  x   = (uint8_t* )key;
+  
+  for (i=0; i<32; i++) {
+    dst[i] = 0;
+  }
+  
+  for (i=0; i<8; i++) {
+    // get schedule from array according to key value
+    src = (DES_LONG*)&ks_tbl[i][x[i]];
+    
+    // bit or with destination
+    for (j=0; j<32; j++) {
+      dst[j] |= src[j];
+    }
+  }
+}
+
+// ########################################################
+int main (int argc, char *argv[])
+{
+  DES_cblock       pt, key;
+  DES_cblock       ct1, ct2;
+  DES_key_schedule ks1, ks2;
+  
+  if (argc!=3) {
+    printf ("  usage: dt <plaintext> <key>\n");
+    return 0;
+  }
+  
+  // clear pt + key
+  memset (pt, 0, sizeof (pt));
+  memset (key, 0, sizeof (key));
+  
+  // copy input from user
+  strncpy (pt, argv[1], sizeof(pt));
+  strncpy (key, argv[1], sizeof(key));
+  
+  // encrypt plaintext
+  DES_set_key (&key, &ks1);
+  DES_ecb_encrypt (&pt, &ct1, &ks1, DES_ENCRYPT);
+  
+  // encrypt plaintext using precomputed schedules
+  DES_init_keys();   // only needs to be called once
+  DES_set_keyx (&key, &ks2);
+  DES_ecb_encrypt (&pt, &ct2, &ks2, DES_ENCRYPT);
+  
+  printf ("  ct1==ct2 : %s", 
+    memcmp (ct1, ct2, sizeof(DES_cblock))==0 ? "TRUE" : "FALSE");
+  
+  return 0;
+}
+[/code]
+
+In DES_set_keyx() there are 7 key schedules obtained to create 1 for the key provided. Consider now if we are only updating the key schedule with 1 that represents a new character in the password/key. This is the key area of optimization for L0phtCrack since 2.5 and It's what I'll try reimplement using 32-bit code for illustration.
+
+But consider another approach where there's less computation again, 
+
+<strong>Precomputed key schedules and password indexes</strong>
+
+[code language="cpp"]
+// DES using precomputed key schedules
+//
+// Odzhan
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <openssl/des.h>
+
+DES_key_schedule ks_tbl[8][256];
+
+// precompute DES key schedules for alphabet
+void DES_init_keys (char alphabet[]) 
+{
+  DES_cblock key;
+  int i, j;
+  int alpha_len=strlen(alphabet);
+  
+  memset (key, 0, sizeof(key));
+  
+  // for 64-bit key
+  for (i=0; i<8; i++) {
+    // create 256 key schedules
+    for (j=0; j<alpha_len; j++) {
+      key[i] = alphabet[j];
+      DES_set_key (&key, &ks_tbl[i][j]);
+    }
+    // clear byte
+    key[i] = 0;
+  }
+}
+
+// generate key schedule from precomputed keys
+void DES_set_keyx (uint32_t *key_idx, DES_key_schedule *ks) 
+{
+  DES_LONG *src, *dst;
+  int i, j;
+
+  dst = (DES_LONG*)ks;
+  
+  for (i=0; i<32; i++) {
+    dst[i] = 0;
+  }
+  
+  for (i=0; i<8; i++) {
+    // get key schedule from array according to key value
+    src = (DES_LONG*)&ks_tbl[i][key_idx[i]];
+    
+    // bit or with destination
+    for (j=0; j<32; j++) {
+      dst[j] |= src[j];
+    }
+  }
+}
+
+// convert password to key indexes
+int pwd2idx (uint32_t pwd_idx[], char pwd[], char alphabet[])
+{
+  uint32_t idx, pwd_len;
+  int i;
+  
+  pwd_len=strlen (pwd);
+  
+  for (i= 0; i<pwd_len; i++) {
+    idx = strchr(alphabet, pwd[i]) - alphabet + 1;
+    if (idx == 0) {
+      return 0;
+    }
+    pwd_idx[i] = idx - 1;
+  }
+  return 1;
+}
+
+// ########################################################
+int main (int argc, char *argv[])
+{
+  DES_cblock       pt, key;
+  DES_cblock       ct1, ct2;
+  DES_key_schedule ks1, ks2;
+  char             *alphanum="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  int              i;
+  char             pwd[16];
+  uint32_t         pwd_idx[16];
+  
+  if (argc!=3) {
+    printf ("  usage: dt <plaintext> <key>\n");
+    return 0;
+  }
+  
+  // clear pt + key
+  memset (pt, 0, sizeof (pt));
+  memset (key, 0, sizeof (key));
+  memset (pwd, 0, sizeof (pwd));
+  memset (&pwd_idx, 0, sizeof (pwd_idx));
+  
+  // copy input from user
+  strncpy (pt, argv[1], sizeof(pt));
+  strncpy (pwd, argv[2], sizeof(key));
+  
+  // convert key to uppercase
+  for (i=0; i<strlen(argv[2]); i++) {
+    pwd[i] = toupper(argv[2][i]);
+    key[i] = toupper(argv[2][i]);
+  }
+  
+  // encrypt plaintext using regular DES encryption
+  DES_set_key (&key, &ks1);
+  DES_ecb_encrypt (&pt, &ct1, &ks1, DES_ENCRYPT);
+  
+  // encrypt plaintext using precomputed schedules
+  // first, initialize key schedules based on alpha numeric alphabet
+  printf ("\n1] setting up keys for %s", alphanum);
+  DES_init_keys(alphanum);
+  // conver the key to indexes using alpha numeric alphabet
+  printf ("\n2] converting \"%s\" to indexes", pwd);
+  pwd2idx (pwd_idx, pwd, alphanum);
+  // now set the key schedule based on key indexes
+  printf ("\n3] deriving key schedule based on indexes");
+  DES_set_keyx (pwd_idx, &ks2);
+  // and encrypt
+  printf ("\n4] encrypting..");
+  DES_ecb_encrypt (&pt, &ct2, &ks2, DES_ENCRYPT);
+  
+  // now compare..
+  printf ("\n  ct1==ct2 : %s", 
+    memcmp (ct1, ct2, sizeof(DES_cblock))==0 ? "TRUE" : "FALSE");
+  
+  return 0;
+}
+[/code]
+
+And the results of this with "password" as key to demonstrate that it works.
+
+[code language="cpp"]
+1] setting up keys for ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+2] converting "PASSWORD" to indexes
+3] deriving key schedule based on indexes
+4] encrypting..
+  ct1==ct2 : TRUE
+[/code]
+
+<strong>Version 1</strong>
+
+<strong>Version 2</strong>
+
+[code language="cpp"]
+
+start pwd : A
+end pwd   : ZZZZZZZ
+alphabet  : ABCDEFGHIJKLMNOPQRSTUVWXYZ
+total pwd : 8353082582
+
+password found: ZZZZZZ
+ Completed: 321272406 2.73M k/s
+
+[/code]
+
+Slight improvement over previous code but nothing spectacular.
+
+<strong>Version 3</strong>
+
+start pwd : A
+end pwd   : ZZZZZZZ
+alphabet  : ABCDEFGHIJKLMNOPQRSTUVWXYZ
+total pwd : 8353082582
+
+password found: ZZZZZZ
+ Completed: 321272406 4.08M k/s
+
+<strong>Version 4</strong>
+
+At this point, there's not a huge amount of optimization we can do without integrating the DES routine.
+
+The significance of the above code is that you only need to precompute the key schedules based on alphabet, then in future use indexes to those key schedules in order to create ciphertext that will check password hash.
+
+Now that we understand how to exploit shortcut in key scheduling, we rewrite the simple brute force cracker and see the results.
+
+..demonstrate speed
+
+Wow, 450% increase in speed almost like L0phtcrack, still not impressed?
+
+<strong>Initial and Final Permutation</strong>
+
+Before encryption, the plaintext is permuted, after encryption it's permuted again.
+These steps are completely unnecessary and are only required to be compatible with DES specifications which when designed had crappy hardware.
+
+Since the plaintext of every MS lanman hash is the same, we can permute it in advance and simply assign to L and R before rounds of DES.
+Since we're attacking lanman hashes, we can also remove this process by permuting in advance.
+
+<strong>16 rounds</strong>
+
+The last round of encryption is only necessary if the first value matches a ciphertext we're searching for so we can also eliminate this step unless we need to compute last 32-bits of DES block.
+
+<strong>Final version with optimizations</strong>
+
+<strong>Assembly implementation</strong>
+
+The final stage of optimization is to implement everything in assembly. That's not to suggest hand writing assembly is always going to be faster, this isn't always true but I'll be using the assembler implementations from OpenSSL to help out and hopefully we'll achieve something ressembling L0phtCrack.
+
+<strong>Conclusion</strong>
+
+What I've shown here is something close to what L0phtcrack used to optimize attacks against LM hashes. I am fairly certain most LM crackers now use similar methods but the authors never revealed publicly how exactly it all worked.
+
+It is Mudge's birthday on Tuesday 1st December, if you're reading this Peter, have a great day. :)

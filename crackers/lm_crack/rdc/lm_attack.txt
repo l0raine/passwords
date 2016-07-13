@@ -1,0 +1,344 @@
+
+
+  And here is "probably" the smallest permutation algorithm ever written.
+  This was written by Alex ? the author of SamInside and PasswordsPro.
+  
+  __asm { 
+     pushad 
+     mov edi,offset szPassword 
+     mov ebx,offset bAlphabet 
+  L1: 
+     movzx eax,byte ptr [edi] 
+     xlat 
+     cmp al,0 
+     je L3 
+     mov [edi],al 
+     jmp L5
+  L3:
+     xlat 
+     stosb 
+     jmp L1 
+  L5: 
+     popad 
+  }
+  
+  I felt there might be some additional optimizations for the existing algorithm
+  and while I haven't tested this code for performance, it eliminates 1 of the jumps.
+
+  __asm {
+    pushad
+    lea edi, [szPassword]
+    lea ebx, [bAlphabet]
+  L1:
+    movzx eax, byte ptr [edi]
+    mov al, byte ptr[eax+ebx]
+    mov byte ptr [edi], al
+    test al, al
+    jnz L2
+    
+    mov al, byte ptr[eax+ebx]
+    mov byte ptr[edi], al
+    inc edi
+    jmp L1
+  L2:
+    popad
+  }
+  
+  While it looks nice, It would be nicer to have something similar in C
+  so it can compile on additional architectures if required.
+  
+  The loop itself can be written like this:
+  
+  for (j = 0;;j++) {
+    szPassword[j] = bAlphabet[szPassword[j]];
+    if (bAlphabet[j] != 0) {
+      break;
+    }  
+    szPassword[j] = bAlphabet[szPassword[j]];
+  }
+  
+  
+    
+              Coding: Optimization of LM brute force
+  
+  
+# Introduction
+
+  Brute force is also referred to by some as "dumb mode" because it doesn't 
+  generate passwords based on any set of rules the way "smart" password 
+  generators do. ( like humans, apparently :) )
+  
+  However "dumb" it may be, sometimes exhausting every possible combination is 
+  the only sure way to recover passwords. Of course, in case of LM, it's not 
+  necessary if we exploit the "pass the hash" flaw. [x] or use the NTLM hash 
+  for kerberos authentication. [x] (assuming a kerberos server is available)
+  There's also the option of using rainbow tables. [x]
+  
+  So you may be wondering why optimizing LM brute force attack when it's 
+  probably easier to exploit the SMB or Kerberos protocols?
+  
+  
+# Wind the clock back..
+  
+  In 2003, a Russian security researcher reverse engineered the encryption
+  algorithms used to protect the Active Directory database (NTDS.dit)
+  
+  This largely went unnoticed by the security community because the articles
+  were written in Russian and no tool to perform the final decryption was
+  released.
+
+  The author described how to decrypt the hashes which were protected 
+  using a procedure almost identical to the PEK algorithm protecting 
+  SAM database. [x]
+  
+  The same recovery feature was introduced commercially in 2009 by Passcape [x]
+  followed by public disclosure in 2011 [x] which utilized libesedb by Joachim Metz [x]
+  
+  So while a lot of people believed Lanman hashes were unrecoverable on newer 
+  systems, one for every user still existed in the LDAP database and you only 
+  needed the correct tools to extract them.
+  
+  
+# Today
+
+  As a result of new tools and requests made to authors of GPU password crackers,
+  attacking LM hashes is popular and we see that with the requests
+  made to implement the LM algorithm in GPU crackers like Hashcat [x] and EGB. [x]
+  
+  Performance on GPU is impressive but this optimization has only been tested on 
+  CPU since it was written initially back in 2005 before CAL and CUDA existed.
+  
+  At the time, I searched for the most optimal algorithm that didn't utilize 
+  bitslice described by Eli Biham [x] 
+  
+  Then, the best password attack tools were John The Ripper[x] and L0phtCrack.[x] 
+  SamInside [x] eventually surpassed L0phtcrack in stability, features and performance.
+  
+  The code I describe here has been implemented successfully in some commercial
+  password recovery tools and while it won't outperform a GPU version, I think you'll
+  be surprised by how much the algorithm can be improved with some minor tweaks. :)
+
+  
+# Permutations
+
+  Read about this or combinatorics and you'll realize how useful these subjects
+  are for password recovery purposes.
+  
+  Sorry to folks that can't read code too well but I'm going to start pasting snippets
+  so you can see clearly what I'm trying to accomplish.
+  
+  Here's a function in C that generates every permutation of an alphabet for each length
+  up to max_len.
+  
+  void perm(int min_len, int max_len, 
+      const char alphabet[], void (*word_func)(char word[])) {
+    
+    uint64_t start, end, cbn;
+    size_t alpha_len;
+    int i;
+    char word[32];
+    
+    memset(word, 0, sizeof(word));
+    alpha_len = strlen(alphabet);
+    
+    for (; min_len <= max_len; min_len++) {
+      for (end = 1, i = 0; i < min_len; i++) {
+        end *= alpha_len;
+      }
+      for (start = 0; start < end; start++) {
+        cbn = start;
+        for (i = 0; i < min_len; i++) {
+          word[i] = alphabet[cbn % alpha_len];
+          cbn /= alpha_len;
+        }
+        word_func(word);
+      }
+    }
+  }
+
+  This is only the main function which when used correctly produces output
+  similar to the following.
+  
+  C:\>perm 3 3 abc
+
+    aaa
+    baa
+    caa
+    aba
+    ...
+    acc
+    bcc
+    ccc
+
+
+# Speeding on the needle bliss
+
+  The following benchmarks show performance of LM password cracking.
+  
+        +====================================+
+        | Tool        | Version   | Avg. k/s |
+        +====================================+
+        | L0phtCrack  | 5.04      | 8.3M     |
+        +------------------------------------+
+        | Cain & Abel | 4.9.43    | 11.2M    |
+        +------------------------------------+
+        | SamInside   | 2.7.0.1   | 12.9M    |
+        +------------------------------------+
+        | WPR         | 7.1.1.522 | 10.2M    |
+        +------------------------------------+
+        | crack_lm    | 0.1       | 3.71M    |
+        +------------------------------------+
+       
+  Hmmm, this is extremely disappointing for poor crack_lm.
+
+  The above benchmarks are only using 32-bit code with perhaps a mix of vectorized
+  operations but no fancy algorithms like bitslicing.
+
+  It should be noted, some of these tools are much faster now than they were in 2005
+  and in fact, some of these tools use methods I describe here.
+
+  Let's for arguments sake suppose you want to implement your own recovery tool
+  and you realize it's difficult to achieve the same performance as popular
+  tools mentioned above.
+
+  DES_key_schedule ks_tbl[8][256];
+  
+  void DES_init_keys(const char s[]) {
+    uint8_t key[8], pw[8];
+    size_t i, j, len;
+    
+    len = strlen(s);
+    
+    for (i = 0; i < 8; i++) {
+      memset(pw, 0, sizeof(pw));
+      for (j = 0; j < len; j++) {
+        pw[i] = s[j];
+        DES_str_to_key(pw, key);
+        DES_set_key(key, &ks_tbl[i][j]);
+      }
+    }
+  }
+
+  This function precomputes all the key schedules for each character in our
+  alphabet at each index of a 64-bit key (8 in total) and saves in ks_tbl.
+  
+  Then when a key schedule is required for a string of characters,
+  we retrieve each key schedule from ks_tbl array. 
+  
+  If our alphabet was "ABC" and our first password to try is "A" then the first 
+  key schedule would be ks_tbl[0][0]
+  
+  The last password "ACB" would be combination of:
+  
+      ks_tbl[0][0] | ks_tbl[1][2] | ks_tbl[2][1]
+    
+  Using this approach which is really only useful in password attacks
+  means our key setup costs almost nothing.
+  
+  Here's the generic macro to do this which updates our key schedule.
+  
+      #define DES_SET_KEY(idx) { \
+        s = &ks_tbl[idx-1][key_idx[idx-1]]; \
+        p = &ks[idx]; \
+        d = &ks[idx-1]; \
+        for (i = 0;i < (sizeof(DES_key_schedule) / sizeof(DES_LONG)); i++) { \
+          ((DES_LONG*)d)[i+0] = ((DES_LONG*)p)[i+0] | ((DES_LONG*)s)[i+0]; \
+        } \
+      }
+
+  Using this macro and DES_ecb_encrypt() from OpenSSL, we now have 7.36M
+  Already double the speed of original algorithm.
+  
+  If you look at the internals of DES_ecb_encrypt() you'll see it merely arranges
+  the data according to endianess of CPU before calling DES_encrypt1()
+  
+  Inside DES_encrypt1() are also some macros that rearrange the data, 
+  specifically IP and FP for initial and final permutation.
+  
+  Ig we don't care about endianess, we can avoid calling DES_ecb_encrypt() and 
+  also precompute IP and FP.
+  
+      p1 = plaintext[0];
+      p2 = plaintext[1];
+      IP(p1, p2);
+      p1 = ROTATE(p1, 29) & 0xffffffffL;
+      p2 = ROTATE(p2, 29) & 0xffffffffL;
+      
+      c1 = ciphertext[0];
+      c2 = ciphertext[1];
+      IP(c1, c2);
+      c1 = ROTATE(c1, 29) & 0xffffffffL;
+      c2 = ROTATE(c2, 29) & 0xffffffffL;
+  
+  Finally, inline the DES macros and only perform last round of encryption
+  if our first 32-bits of encrypted password equals 32-bits of our hash.
+  
+      r = p1;
+      l = p2;
+
+      x = ks[0].ks->deslong;
+
+      D_ENCRYPT(l, r,  0);
+      D_ENCRYPT(r, l,  2);
+      D_ENCRYPT(l, r,  4);
+      D_ENCRYPT(r, l,  6);
+      D_ENCRYPT(l, r,  8);
+      D_ENCRYPT(r, l, 10);
+      D_ENCRYPT(l, r, 12);
+      D_ENCRYPT(r, l, 14);
+      D_ENCRYPT(l, r, 16);
+      D_ENCRYPT(r, l, 18);
+      D_ENCRYPT(l, r, 20);
+      D_ENCRYPT(r, l, 22);
+      D_ENCRYPT(l, r, 24);
+      D_ENCRYPT(r, l, 26);
+      D_ENCRYPT(l, r, 28);
+
+      if (c1 == l) {
+        D_ENCRYPT(r, l, 30);
+        if (c2 == r) {
+          printf("\nFound password");
+          dump_pw(key_idx);
+          return;
+        }
+      }
+                
+  Now we're getting 9.49M but let's optimize the DES_SET_KEY macro using SSE2
+  
+      #define DES_SET_KEY(idx) { \
+        __m128i *s = (__m128i*)&ks_tbl[idx-1][key_idx[idx-1]]; \
+        __m128i *p = (__m128i*)&ks[idx]; \
+        __m128i *d = (__m128i*)&ks[idx-1]; \
+        if (idx == 7) { \
+          for (i = 0; i < 8; i++) { \
+            d[i] = s[i]; \
+          } \
+        } else { \
+          for (i = 0; i < 8; i++) { \
+            d[i] = _mm_or_si128(s[0], p[0]); \
+          } \
+        } \
+      }
+
+  Now we have 10.66M but I'm sure we can do better than this.
+  Compiling with GCC 4.5.3 the code is running at 11.39M which is
+  nearly 4x the speed of initial code.
+
+  The final result of simple optimizations with C is 11.39M, an almost 4x 
+  increase in performance and that's not too bad for CPU, is it? :) 
+  
+
+# Conclusion
+
+  Can it be improved?
+
+  You could optimize further with a pure ASM implementation and I have done this
+  in an old tool which reached speed of 13.5M attacking just 1 hash.
+  
+  Multithreaded on quad core and you'll get almost ~50M k/s which is nearly as
+  fast as some GPU implementations.
+  
+  Attacking multiple hashes would push this back by about ~1M but that's the cost of
+  a table lookup after each encryption and would ressemble the speed of SamInside.
+  
+  Source code to demonstrate optimizations is in crack_lm.zip

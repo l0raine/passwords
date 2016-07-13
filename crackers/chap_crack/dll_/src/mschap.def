@@ -1,0 +1,7 @@
+LIBRARY mschap
+EXPORTS InitBFKeyThread
+EXPORTS BFKeyThread
+EXPORTS GetKeyIterations
+EXPORTS GetBFKeyIndexes
+EXPORTS IsPasswordValid
+EXPORTS InitKeyParams

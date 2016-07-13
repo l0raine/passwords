@@ -1,0 +1,316 @@
+core2.inc(16) : Error A2055: Invalid instruction operands
+ move_ks(6)[des_macros.inc]: Macro called from
+  core2.inc(16): Included by
+   includez.inc(65): Included by
+    rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(16) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(16): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(18) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(18): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(20) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(20): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(22) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(22): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(3)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(5)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vorps
+ bit_or_ymm_256(6)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(8)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2233: Syntax error: vmovups
+ bit_or_ymm_256(9)[des_macros.inc]: Macro called from
+  move_ks(16)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(24) : Error A2133: Too many errors
+core2.inc(24) : Error A2233: Syntax error: vmovaps
+ bit_or_ymm_256(2)[des_macros.inc]: Macro called from
+  move_ks(17)[des_macros.inc]: Macro called from
+   core2.inc(24): Included by
+    includez.inc(65): Included by
+     rdc.asm(56): Main line code
+core2.inc(26) : Error A2165: Unmatched block nesting: crack_des_core2
+ core2.inc(26): Included by
+  includez.inc(65): Included by
+   rdc.asm(56): Main line code
