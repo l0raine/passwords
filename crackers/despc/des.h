@@ -82,6 +82,16 @@ typedef /* const */ unsigned char const_DES_cblock[8];
  * const_DES_cblock * are incompatible pointer types.
  */
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#define ALIGNED_(x) __declspec(align(x))
+#elif defined (__GNUC__)
+#include <x86intrin.h>
+#define ALIGNED_(x) __attribute__ ((aligned(x)))
+#endif
+
+#define _ALIGNED_TYPE(t,x) typedef t ALIGNED_(x)
+
 typedef struct DES_ks {
     union {
         DES_cblock cblock;

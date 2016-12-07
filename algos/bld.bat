@@ -1,6 +1,6 @@
 @echo off
-set OPENSSL_PATH=C:\openssl-1.0.2\inc32
-set OPENSSL_LIB=C:\openssl-1.0.2\out32\libeay32.lib
+set OPENSSL_PATH=C:\openssl\inc32
+set OPENSSL_LIB=C:\openssl\out32\libeay32.lib
 cl /nologo /O1 apache\aprcrypt.c /I %OPENSSL_PATH% %OPENSSL_LIB%
 cl /nologo /O1 bcrypt\bcrypt.c bcrypt\blf.c
 cl /nologo /O1 cisco\cisco_pix.c /I %OPENSSL_PATH% %OPENSSL_LIB%

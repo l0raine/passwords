@@ -38,20 +38,11 @@
 
 #include <windows.h>
 
-#ifdef _MSC_VER
-#include <intrin.h>
-#elif defined (__GNUC__)
-#include <x86intrin.h>
-#endif
-
 #include "des_locl.h"
 #include "spr.h"
 
 #define MAX_PWD 7
 #define MAX_ALPHA 256
-
-DES_key_schedule ks_tbl[8][256];
-DES_key_schedule ks[8];
 
 char *alphabets[]=
 { "0123456789",                          // numeric
@@ -59,21 +50,65 @@ char *alphabets[]=
   " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"  // symbols
 };
 
-char alphabet[MAX_ALPHA+1];
-uint32_t alpha_len;
+typedef struct _t_param {
+  char     alphabet[MAX_ALPHA+1];
+  uint32_t alpha_len;
+  DES_LONG ct[2], pt[2];
+  char     pwd[MAX_PWD+1];
+  char     start_pwd[MAX_PWD+1];
+  char     end_pwd[MAX_PWD+1];
+  uint32_t pwd_idx[16];
+  __int64  start_cbn, end_cbn, total_cbn;
+  volatile __int64 computed;
+} t_param;
 
-DES_LONG lm_hash[2];
-
-char     pwd[MAX_PWD+1], start_pwd[MAX_PWD+1], end_pwd[MAX_PWD+1];
-
-uint32_t pwd_idx[16];
-
-static __int64 start_cbn, end_cbn, total_cbn;
-volatile __int64 computed;
+t_param t_blk[MAXIMUM_WAIT_OBJECTS];
 
 time_t start_time, e_time;
 
-//#pragma intrinsic (_InterlockedCompareExchange64)
+/**
+ *
+ *  1) convert to uppercase, 
+ *  2) sort in ascending order, 
+ *  3) remove duplicates
+ *
+ */
+void sanitize_alpha(char alpha[])
+{
+  int  i, j, n=strlen(alpha);
+  char t;
+  
+  // convert to uppercase
+  for (i=0; i<n; i++) {
+    alpha[i]=toupper(alpha[i]);
+  }
+  // sort in ascending order
+  for (i=0; i<n; i++) {
+    for (j=(i+1); j<n; j++) {
+      if (alpha[i] > alpha[j]) {
+        // swap
+        t=alpha[j];
+        alpha[j]=alpha[i];
+        alpha[i]=t;
+      }
+    }
+  }
+  // remove duplicates
+  for (i=0; i<n; i++) {
+    for (j=i+1; j<n; j++) {
+      // equal?
+      if (alpha[i]==alpha[j]) {
+        // zero out duplicate
+        alpha[j]=0; 
+        // decrease length
+        n--;
+        // move string
+        strncat (alpha, &alpha[j+1], MAX_ALPHA);
+        j--;
+      }
+    }
+  }
+}
 
 /**
  *
@@ -111,14 +146,15 @@ int lm2bin(char lm[], void *in) {
  *  convert password to combinations
  *
  */ 
-uint64_t pwd2cbn(char s[]) {
+uint64_t pwd2cbn(char *s, char *alphabet) {
   uint64_t cbn = 0;
   uint64_t pwr = 1;
-  int      pw_len, i, idx;
+  int      pw_len, i, idx, alpha_len;
   char     *p;
   
   // get password length
-  pw_len = strlen(s);
+  pw_len    = strlen(s);
+  alpha_len = strlen(alphabet);
   
   // for password length
   for (i=0; i<pw_len; i++) {
@@ -143,7 +179,7 @@ uint64_t pwd2cbn(char s[]) {
  *  convert combinations to indexes
  *
  */ 
-void cbn2idx (uint32_t idx[], uint64_t cbn) 
+void cbn2idx (uint32_t idx[], uint64_t cbn, uint32_t alpha_len) 
 {
   uint64_t pwr = alpha_len;
   int      pw_len, i;
@@ -159,6 +195,32 @@ void cbn2idx (uint32_t idx[], uint64_t cbn)
     idx[i] = (cbn % alpha_len); 
     cbn /= alpha_len; 
   }
+}
+
+/**
+ *
+ *  convert combinations to password
+ *
+ */ 
+char* cbn2pwd (uint64_t cbn, char alphabet[]) 
+{
+  uint64_t    pwr = strlen(alphabet);
+  uint64_t    alpha_len=pwr;
+  int         pw_len, i;
+  static char pwd[MAX_PWD+1]={0};
+  
+  // determine the password length
+  for (pw_len=1; cbn>=pwr; pw_len++) {
+    cbn -= pwr; 
+    pwr *= alpha_len;
+  }
+  
+  // create indexes for number
+  for (i=0; i<pw_len; i++) { 
+    pwd[i] = alphabet[(cbn % alpha_len)]; 
+    cbn /= alpha_len; 
+  }
+  return pwd;
 }
 
 /**
@@ -186,11 +248,11 @@ void DES_str_to_key (char str[], uint8_t key[])
 }
 
 // precompute DES key schedules for alphabet
-void DES_init_keys (void) 
+void DES_init_keys (char alphabet[], DES_key_schedule ks_tbl[][256]) 
 {
   DES_cblock key;
   char       str[8];
-  uint32_t   i, j;
+  uint32_t   i, j, alpha_len=strlen(alphabet);
 
   memset (str, 0, sizeof(str));
   
@@ -209,8 +271,8 @@ void DES_init_keys (void)
 }
 
 // generate DES key schedule from precomputed keys
-// as a function is slower, significantly more than using SSE2
-void DES_set_keyx (uint32_t *key_idx, 
+// the macro is slower but this works too
+void DES_set_keyx (DES_key_schedule **ks_tbl, uint32_t *key_idx, 
   DES_key_schedule *ks_out) 
 {
   DES_LONG *src, *dst;
@@ -234,7 +296,7 @@ void DES_set_keyx (uint32_t *key_idx,
   }
 }
 
-// set key using macro, faster using SSE2
+// set key using precomputed schedules, cracking is faster with SSE2 macro
 #ifdef SSE2
 #include <emmintrin.h>
 
@@ -268,24 +330,43 @@ void DES_set_keyx (uint32_t *key_idx,
   } \
 }
 #endif
-
-// basic function to generate passwords
-// will encrypt known plaintext with DES and compare with LM ciphertext
-DWORD crack_lm (LPVOID lpParam) 
-{
-  const char       pt[]="KGS!@#$%";
-  DES_LONG         p1, p2;
-  DES_LONG         c1, c2;
-  DES_LONG         *x=(DES_LONG*)pt;
-  uint64_t         total=total_cbn, i, j, sqr_len=alpha_len*alpha_len;
   
+// main thread to recover plaintext of DES hash
+DWORD crack_thread (LPVOID lpParam) 
+{
+  uint64_t         i, j, total_cbn;
+  uint32_t         pwd_idx[16], alpha_len;
+#ifdef _MSC_VER
+  DES_key_schedule __declspec(align(16)) ks_tbl[8][256];
+  DES_key_schedule __declspec(align(16)) ks[8];
+#else
+  DES_key_schedule ks_tbl[8][256] __attribute__ ((aligned(16)));
+  DES_key_schedule ks[8] __attribute__ ((aligned(16)));
+#endif
+  DES_LONG         c1, c2, p1, p2;
+  t_param          *p=(t_param*)lpParam;
+
   register DES_LONG l, r, t, u;
 #ifdef DES_PTR
   register const unsigned char *des_SP = (const unsigned char *)DES_SPtrans;
 #endif
   register DES_LONG *s;
   
-  // zero initialize key schedules
+  alpha_len = strlen(p->alphabet);
+  total_cbn = p->total_cbn;
+  
+  c1=p->ct[0];
+  c2=p->ct[1];
+  
+  p1=p->pt[0];
+  p2=p->pt[1];
+  
+  //printf ("c1=%08X c2=%08X p1=%08X p2=%08X", c1, c2, p1, p2);
+  
+  // precompute key schedule table using alphabet
+  DES_init_keys(p->alphabet, ks_tbl);
+  
+  // zero initialize key schedules for each index
   for (i=0; i<8; i++) {
     memset (&ks[i], 0, sizeof (DES_key_schedule));
   }
@@ -294,30 +375,15 @@ DWORD crack_lm (LPVOID lpParam)
   for (i=0; i<8; i++) 
     pwd_idx[i] = -1;
   
-  // zero password
+  // zero password (should be done already)
   for (i=0; i<8; i++) 
-    pwd[i] = 0;
+    p->pwd[i] = 0;
   
-  // convert combinations to indexes
-  cbn2idx(pwd_idx, start_cbn);
+  // convert start password to indexes
+  cbn2idx(pwd_idx, p->start_cbn, alpha_len);
   
-  computed=0;
-  
-  // perform initial permutation on plaintext
-  p1 = x[0];
-  p2 = x[1];
-  IP(p1, p2);
-  p1 = ROTATE(p1, 29) & 0xffffffffL;
-  p2 = ROTATE(p2, 29) & 0xffffffffL;
-                
-  // perform initial permutation on ciphertext
-  c1 = lm_hash[0];
-  c2 = lm_hash[1];
-  IP(c1, c2);
-  c1 = ROTATE(c1, 29) & 0xffffffffL;
-  c2 = ROTATE(c2, 29) & 0xffffffffL;
-  
-  printf ("c1=%08X c2=%08X p1=%08X p2=%08X", c1, c2, p1, p2);
+  // set computed to zero
+  p->computed=0;
   
   // set initial key schedules
   for (i=MAX_PWD; i>0; i--) {
@@ -343,9 +409,11 @@ DWORD crack_lm (LPVOID lpParam)
               do {
                 DES_SET_KEY(1);
 compute_lm:                
+                // load plaintext
                 r = p1;
                 l = p2;
                 
+                // set pointer to key schedule
                 s = ks->ks->deslong;
 
                 D_ENCRYPT(l, r, 0);     /* 1 */
@@ -364,21 +432,29 @@ compute_lm:
                 D_ENCRYPT(r, l, 26);    /* 14 */
                 D_ENCRYPT(l, r, 28);    /* 15 */
 
-                computed++;
+                // update how many keys processed
+                p->computed++;
                 
+                // compare result with first block of ciphertext
                 if (c1 == l) {
+                  // compute last round
                   D_ENCRYPT(r, l, 30);
+                  // equals last block of ciphertext?
                   if (c2 == r) {
+                    // convert indexes to plaintext password
                     for (i=0; i<MAX_PWD; i++) {
                       if (pwd_idx[i]==-1) break;
-                      pwd[i] = alphabet[pwd_idx[i]];
+                      p->pwd[i] = p->alphabet[pwd_idx[i]];
                     }
+                    printf ("found it"); Sleep(1000);
                     return 1; // return found
                   }
                 }                             
-                
-                if (--total == 0) return 0;
+                // decrement total, return if zero
+                if (--total_cbn == 0) return 0;
+                // increment password index until equals alpha_len
               } while (++pwd_idx[0] < alpha_len);
+              // then reset that index to zero
               pwd_idx[0] = 0;
             } while (++pwd_idx[1] < alpha_len);
             pwd_idx[1] = 0;
@@ -395,10 +471,10 @@ compute_lm:
   return 0; // return not found
 }
 
-void show_stats (void) 
+void show_stats (t_param p[MAXIMUM_WAIT_OBJECTS], uint32_t t_nbr, uint64_t total_cbn) 
 {
-  uint32_t days, hours, minutes, seconds; 
-  uint64_t cbn_cmp, eta, pct;
+  uint32_t i, days, hours, minutes, seconds; 
+  uint64_t cbn_cmp=0, eta, pct;
   uint64_t speed;
   uint64_t t;
 
@@ -406,12 +482,14 @@ void show_stats (void)
 
   if (t==0) return;
   
-  #ifdef _MSC_VER
-    cbn_cmp=_InterlockedCompareExchange64(&computed, 0, -1);
-  #elif defined(__GNUC__)
-    cbn_cmp=__sync_val_compare_and_swap(&computed, 0, -1);
-  #endif
-  
+  for (i=0; i<t_nbr; i++)
+  {
+    #ifdef _MSC_VER
+      cbn_cmp += _InterlockedCompareExchange64(&p[i].computed, 0, -1);
+    #elif defined(__GNUC__)
+      cbn_cmp += __sync_val_compare_and_swap(&p[i].computed, 0, -1);
+    #endif
+  }
   if (cbn_cmp==0) return;
   
   pct = (100 * cbn_cmp) / total_cbn;
@@ -444,6 +522,16 @@ void show_stats (void)
     cbn_cmp, total_cbn, (float)speed/1000/1000, pct, days, hours, minutes, seconds);
 }
 
+int32_t cpus (void) {
+#ifdef _WIN32
+  SYSTEM_INFO sysinfo;
+  GetSystemInfo(&sysinfo);
+  return (int32_t) sysinfo.dwNumberOfProcessors;
+#else
+  return (int32_t) sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+}
+
 void usage(void)
 {
   printf("  [ usage: clm [options] <hash>\n\n");
@@ -453,7 +541,9 @@ void usage(void)
          "                      2=symbols\n\n");
   printf("       -c <alphabet>  custom alphabet to use\n");
   printf("       -s <start>     start password\n");
-  printf("       -e <end>       end password\n\n");
+  printf("       -e <end>       end password\n");
+  printf("       -t <threads>   number of threads (should not exceed %i)\n\n", 
+    MAXIMUM_WAIT_OBJECTS);
   exit(1);
 }
 
@@ -493,11 +583,19 @@ void setw (SHORT X)
 
 int main(int argc, char *argv[]) 
 {
-  time_t rawtime;
-  struct tm * timeinfo;
-  
-  HANDLE hThread;
-  DWORD found=0;
+  time_t     rawtime;
+  struct     tm * timeinfo;
+  char       alphabet[MAX_ALPHA+1];
+  char       start_pwd[MAX_PWD+1], end_pwd[MAX_PWD+1];
+  uint64_t   start_cbn, end_cbn, thread_cbn, total_cbn;
+  uint64_t   thread_run, thread_cnt=1, cpu_cnt, pos;
+  DES_LONG   lm_hash[2];
+  const char pt[]="KGS!@#$%";
+  DES_LONG   p1, p2;
+  DES_LONG   c1, c2;
+  DES_LONG   *x=(DES_LONG*)pt;
+  HANDLE     hThreads[MAXIMUM_WAIT_OBJECTS];
+  DWORD      found=0, alpha_len;
   
   int len, i;
   
@@ -535,6 +633,10 @@ int main(int argc, char *argv[])
         case 's':
           s_pwd=getparam (argc, argv, &i);
           break;
+        // number of threads
+        case 't':
+          thread_cnt=atoi(getparam (argc, argv, &i));
+          break;
         case 'h':
         case '?':
           usage();
@@ -560,6 +662,23 @@ int main(int argc, char *argv[])
     return 0;
   }
   
+  // perform initial permutation on plaintext
+  p1 = x[0];
+  p2 = x[1];
+  IP(p1, p2);
+  p1 = ROTATE(p1, 29) & 0xffffffffL;
+  p2 = ROTATE(p2, 29) & 0xffffffffL;
+                
+  // perform initial permutation on ciphertext
+  c1 = lm_hash[0];
+  c2 = lm_hash[1];
+  IP(c1, c2);
+  c1 = ROTATE(c1, 29) & 0xffffffffL;
+  c2 = ROTATE(c2, 29) & 0xffffffffL;
+  
+  // zero alphabet
+  memset (alphabet, 0, sizeof (alphabet));
+  
   // if alphabet specified, add each
   if (a_idx!=NULL) {
     len=strlen (a_idx);
@@ -580,16 +699,23 @@ int main(int argc, char *argv[])
         MAX_ALPHA - strlen(alphabet));
     }
   } else 
-  // custom alphabet? we don't check for duplicate characters
+  // custom alphabet?
   if (c_ab!=NULL) {
     strncpy (alphabet, c_ab, MAX_ALPHA);
+    // remove any duplicate characters and convert to uppercase
+    sanitize_alpha(alphabet);
   } else {
   // no alphabet provided, just use alpha+numeric
     strncat (alphabet, alphabets[0], MAX_ALPHA);
     strncat (alphabet, alphabets[1], MAX_ALPHA - strlen (alphabet));
   }
-
-  alpha_len = strlen (alphabet);
+  
+  alpha_len = strlen(alphabet);
+  
+  if (!alpha_len) {
+    printf ("  [ no alphabet to use\n");
+    return 0;
+  }
   
   // zero passwords
   memset (start_pwd, 0, sizeof (start_pwd));
@@ -612,13 +738,13 @@ int main(int argc, char *argv[])
   }
   
   // set start combination
-  if ((start_cbn = pwd2cbn(start_pwd))==0) {
+  if ((start_cbn = pwd2cbn(start_pwd, alphabet))==0) {
     printf ("  [ invalid start password\n");
     return 0;
   }
   
   // set end combination
-  if ((end_cbn = pwd2cbn(end_pwd))==0) {
+  if ((end_cbn = pwd2cbn(end_pwd, alphabet))==0) {
     printf ("  [ invalid end password\n");
     return 0;
   }
@@ -633,44 +759,104 @@ int main(int argc, char *argv[])
   start_cbn--;
   // subtract start and end for total
   total_cbn = end_cbn - start_cbn;
-  
-  // precompute key schedules
-  DES_init_keys();
+  // get available cpus
+  cpu_cnt = cpus();
+  // ensure thread_cnt don't exceed cpu_cnt
+  if (thread_cnt > cpu_cnt) {
+    thread_cnt = cpu_cnt;
+  }
+  // ensure thread_cnt don't exceed total_cbn
+  if (thread_cnt > total_cbn) {
+    thread_cnt = total_cbn;
+  }
+  // divide total combinations by thread count
+  thread_cbn = (total_cbn / thread_cnt);
 
+  // get the current time
   time ( &rawtime );
   timeinfo = localtime ( &rawtime );
   
+  // display information about attack
   printf ("  [ starting on : %s",        asctime (timeinfo));
   printf ("  [ start pwd   : \"%s\"\n",  start_pwd);
   printf ("  [ end pwd     : \"%s\"\n",  end_pwd);
   printf ("  [ alphabet    : \"%s\"\n",  alphabet);
-  printf ("  [ total pwd   : %I64i\n\n", total_cbn);
+  printf ("  [ total pwd   : %I64u\n",   total_cbn);
+  printf ("  [ thread cbn  : %I64u\n",   thread_cbn);
+  printf ("  [ thread cnt  : %I64u\n\n", thread_cnt);
+  
+  pos=start_cbn;
+  
+  for (i=0; i<thread_cnt; i++) {
+    // zero initialize thread parameter block
+    memset (&t_blk[i], 0, sizeof(t_param));
+    
+    t_blk[i].ct[0] = c1;
+    t_blk[i].ct[1] = c2;
+    
+    t_blk[i].pt[0] = p1;
+    t_blk[i].pt[1] = p2;
+    // set the alphabet
+    strncat (t_blk[i].alphabet,  alphabet, MAX_ALPHA);
+    // set start combinations
+    t_blk[i].start_cbn = pos;
+    if ((i+1) == thread_cnt) {
+      t_blk[i].end_cbn = end_cbn - 1;
+    } else {
+      t_blk[i].end_cbn   = pos + thread_cbn;
+    }
+    t_blk[i].total_cbn = (t_blk[i].end_cbn - t_blk[i].start_cbn);
+    
+    /**
+    printf ("\nThread %i total is %I64u start is \"%s\"", 
+      i+1, t_blk[i].total_cbn,
+      cbn2pwd(t_blk[i].start_cbn, alphabet));
+    printf (" end is \"%s\"\n",
+      cbn2pwd(t_blk[i].end_cbn, alphabet)); */
+      
+    // create thread
+    hThreads[i]=CreateThread (NULL, 0, 
+        (LPTHREAD_START_ROUTINE)crack_thread, &t_blk[i], 0, NULL);
+    
+    //SetThreadPriority (hThreads[i], THREAD_PRIORITY_HIGHEST);
+    // update start and end passwords
+    pos = t_blk[i].end_cbn + 1;
+  }
   
   start_time = time(0);
   
-  hThread=CreateThread (NULL, 0, (LPTHREAD_START_ROUTINE)crack_lm, NULL, 0, NULL);
-  
-  SetThreadPriority (hThread, THREAD_PRIORITY_HIGHEST);
-  
-  do {
-    i=WaitForSingleObject (hThread, 3*1000);
+  for (thread_run=thread_cnt; thread_run>0;) {
+    // wait 3 seconds to timeout or threads to finish
+    i=WaitForMultipleObjects (thread_run, hThreads, FALSE, 3*1000);
     // thread ended?
-    if (i==WAIT_OBJECT_0 || i==WAIT_FAILED) {
-      // was password found?
-      GetExitCodeThread(hThread, &found);
-      show_stats();
+    if (i != WAIT_TIMEOUT && i != WAIT_FAILED) {
+      // was password found in this thread?
+      GetExitCodeThread(hThreads[i], &found);
       if (found) {
-        printf ("\n  [ password    : \"%s\"\n", pwd);
+        printf ("\nya");
+        Sleep(1000);
+        show_stats(t_blk, thread_run, total_cbn);
+        printf ("\n  [ password    : \"%s\"\n", t_blk[i].pwd);
+        break;
+      } else {
+        printf ("oops\n");
       }
-      break;
-    } else if (i==WAIT_TIMEOUT) {
-      // update stats
-      show_stats();
+      // close handle to thread
+      CloseHandle(hThreads[i]);
+      // move thread handles and blocks forward in list
+      for (;i<thread_run-1; i++) {
+        hThreads[i]=hThreads[i+1];
+        memcpy (&t_blk[i], &t_blk[i+1], sizeof(t_param));
+      }
+
+      thread_run--;
+    } else {
+      // update stats and continue waiting
+      show_stats(t_blk, thread_cnt, total_cbn);
     }
-  } while (1);
-  
-  e_time = clock();
-  
+  }
+
+  // display time we ended
   time ( &rawtime );
   timeinfo = localtime ( &rawtime );
   printf ("\n  [ ending on   : %s", asctime (timeinfo) );

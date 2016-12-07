@@ -1,3 +1,3 @@
 @echo off
-cl /nologo /O2 /DSSE2 /GS- clm4.c set_key.c
+cl /nologo /DSSE2 /O2 /GS- clm5.c set_key.c
 del *.obj
