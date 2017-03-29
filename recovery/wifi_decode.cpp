@@ -30,17 +30,17 @@
  */
 BOOL isElevated(VOID) {
   HANDLE hToken;
-	BOOL bResult = FALSE;
+  BOOL   bResult = FALSE;
   
   if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
     TOKEN_ELEVATION te;
     DWORD dwSize;
     if (GetTokenInformation(hToken, TokenElevation, &te, 
         sizeof(TOKEN_ELEVATION), &dwSize)) {
-		  bResult = te.TokenIsElevated != 0;
+      bResult = te.TokenIsElevated != 0;
     }
     CloseHandle(hToken);
-	}
+  }
   return bResult;
 }
 
@@ -330,8 +330,11 @@ std::wstring GetAdapterDescription(std::wstring guid) {
 }
 
 DWORD EnumInterfaces(VOID) {
-  HKEY hSubKey;
-  DWORD dwError = RegOpenKeyEx(HKEY_LOCAL_MACHINE, 
+  HKEY  hSubKey;
+  DWORD dwError, dwIndex, cbSize, 
+  WCHAR adapterGuid[256], profileList[4096*4];
+
+  dwError = RegOpenKeyEx(HKEY_LOCAL_MACHINE, 
       L"SOFTWARE\\Microsoft\\Wlansvc\\Interfaces", 0, 
       KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_64KEY, &hSubKey);
   
@@ -339,11 +342,11 @@ DWORD EnumInterfaces(VOID) {
     Error(L"RegOpenKeyEx(\"SOFTWARE\\Microsoft\\Wlansvc\\Interfaces\"", dwError);
     return 0;
   }
-  DWORD dwIndex = 0;
+  
+  dwIndex = 0;
   
   while (dwError == ERROR_SUCCESS) {
-    wchar_t adapterGuid[256];
-    DWORD cbSize = sizeof(adapterGuid) / sizeof(wchar_t);
+    cbSize = sizeof(adapterGuid) / sizeof(wchar_t);
     dwError = RegEnumKeyEx(hSubKey, dwIndex, adapterGuid, 
         &cbSize, NULL, NULL, NULL, NULL);
     if (dwError == ERROR_SUCCESS) {
@@ -367,7 +370,6 @@ DWORD EnumInterfaces(VOID) {
           std::wstring(20, L'-').c_str(),
           std::wstring(20, L'-').c_str());
       
-      wchar_t profileList[4096*4];
       cbSize = sizeof(profileList) / sizeof(wchar_t);
       dwError = RegGetValue(hSubKey, adapterGuid, L"ProfileList", 
           RRF_RT_REG_MULTI_SZ, 0, profileList, &cbSize);
